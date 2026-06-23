@@ -1,0 +1,11 @@
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --pink:#e8547a;--pink-light:#fbeaf0;--pink-mid:#f4c0d1;
+  --dark:#1a1a2e;--card:#16213e;--card2:#0f3460;
+  --text:#f0e6ef;--muted:#a89bb0;--border:rgba(232,84,122,0.3);
+}
+body{background:var(--dark);color:var(--text);font-family:system-ui,sans-serif}
+button{font-family:inherit}
+textarea,input{font-family:inherit}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+@keyframes spin{to{transform:rotate(360deg)}}
