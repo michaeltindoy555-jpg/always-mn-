@@ -8,7 +8,7 @@ import {
 const DOC = 'always-mn'
 const shared = () => doc(db, 'shared', DOC)
 
-// ── Shared single-doc data (moods, milestones, annDate) ──────────────────────
+// ── Shared single-doc data (moods, milestones, annDate, ping, checkins, promises, moodHistory, bgPhoto, milestonePhotos) ──
 export function subscribeShared(cb) {
   return onSnapshot(shared(), snap => cb(snap.exists() ? snap.data() : {}))
 }
@@ -28,6 +28,13 @@ export function subscribeJournal(cb) {
 }
 export async function addJournalEntry(entry) {
   await addDoc(journalCol(), { ...entry, createdAt: serverTimestamp() })
+}
+export async function deleteJournalEntry(id) {
+  await deleteDoc(doc(db, 'shared', DOC, 'journal', id))
+}
+// NEW: update journal entry (used for emoji reactions)
+export async function updateJournalEntry(id, data) {
+  await updateDoc(doc(db, 'shared', DOC, 'journal', id), data)
 }
 
 // ── Letters ───────────────────────────────────────────────────────────────────
@@ -69,5 +76,34 @@ export async function getQodAnswers(qIdx) {
 
 // ── Ping ──────────────────────────────────────────────────────────────────────
 export async function sendPing(from) {
-  await updateShared({ ping: { from, sentAt: Date.now() } })
+  const to = from === 'M' ? 'N' : 'M'
+  await updateShared({ ping: { from, to, unread: true, sentAt: Date.now() } })
+}
+
+// ── Memory Album ──────────────────────────────────────────────────────────────
+const memoriesCol = () => collection(db, 'shared', DOC, 'memories')
+export function subscribeMemories(cb) {
+  return onSnapshot(query(memoriesCol(), orderBy('createdAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  )
+}
+export async function addMemoryPhoto(data) {
+  await addDoc(memoriesCol(), { ...data, createdAt: serverTimestamp() })
+}
+export async function deleteMemoryPhoto(id) {
+  await deleteDoc(doc(db, 'shared', DOC, 'memories', id))
+}
+
+// ── Voice Messages ────────────────────────────────────────────────────────────
+const voiceCol = () => collection(db, 'shared', DOC, 'voice')
+export function subscribeVoiceMessages(cb) {
+  return onSnapshot(query(voiceCol(), orderBy('sentAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  )
+}
+export async function addVoiceMessage(data) {
+  await addDoc(voiceCol(), data)
+}
+export async function markVoicePlayed(id) {
+  await updateDoc(doc(db, 'shared', DOC, 'voice', id), { played: true })
 }

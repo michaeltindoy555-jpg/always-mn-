@@ -1,14 +1,27 @@
 import { useState } from 'react'
 import { addBucketItem, updateBucketItem, deleteBucketItem } from '../firebase/firestore'
 
+const SORT_OPTIONS = [
+  { value: 'default',   label: 'Default' },
+  { value: 'pending',   label: 'Pending first' },
+  { value: 'completed', label: 'Completed first' },
+]
+
 export default function BucketTab({ bucket }) {
   const [input, setInput] = useState('')
+  const [sort, setSort] = useState('default')
 
   const handleAdd = async () => {
     if (!input.trim()) return
-    await addBucketItem({ text: input.trim(), done: false })
+    await addBucketItem({ text: input.trim(), done: false, createdAt: Date.now() })
     setInput('')
   }
+
+  const sorted = [...bucket].sort((a, b) => {
+    if (sort === 'pending')   return (a.done === b.done) ? 0 : a.done ? 1 : -1
+    if (sort === 'completed') return (a.done === b.done) ? 0 : a.done ? -1 : 1
+    return (a.createdAt || 0) - (b.createdAt || 0)
+  })
 
   const done = bucket.filter(b => b.done).length
   const total = bucket.length
@@ -16,7 +29,13 @@ export default function BucketTab({ bucket }) {
   return (
     <div style={{ flex: 1, padding: 16, overflowY: 'auto' }}>
       <div className="card">
-        <div className="card-title">🎯 Our Bucket List</div>
+        <div className="card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>🎯 Our Bucket List</span>
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            style={{ background: 'var(--card2)', border: '0.5px solid var(--border)', borderRadius: 6, color: 'var(--muted)', fontSize: 11, padding: '2px 6px', cursor: 'pointer' }}>
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <input value={input} onChange={e => setInput(e.target.value)} placeholder="Add a dream or goal..."
             onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -25,9 +44,9 @@ export default function BucketTab({ bucket }) {
             <i className="ti ti-plus" />
           </button>
         </div>
-        {bucket.length === 0
+        {sorted.length === 0
           ? <p style={{ color: 'var(--muted)', fontSize: 13 }}>Dream big together!</p>
-          : bucket.map(b => (
+          : sorted.map(b => (
             <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
               <input type="checkbox" checked={b.done} onChange={() => updateBucketItem(b.id, { done: !b.done })}
                 style={{ width: 18, height: 18, accentColor: 'var(--pink)', cursor: 'pointer' }} />
