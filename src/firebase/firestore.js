@@ -107,3 +107,19 @@ export async function addVoiceMessage(data) {
 export async function markVoicePlayed(id) {
   await updateDoc(doc(db, 'shared', DOC, 'voice', id), { played: true })
 }
+// ── Chat ──────────────────────────────────────────────────────────────────────
+const chatCol = () => collection(db, 'shared', DOC, 'chat')
+export function subscribeChat(cb) {
+  return onSnapshot(query(chatCol(), orderBy('createdAt', 'asc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  )
+}
+export async function addChatMessage(msg) {
+  await addDoc(chatCol(), { ...msg, createdAt: serverTimestamp() })
+}
+export async function deleteChatMessage(id) {
+  await deleteDoc(doc(db, 'shared', DOC, 'chat', id))
+}
+export async function updateChatMessage(id, data) {
+  await updateDoc(doc(db, 'shared', DOC, 'chat', id), data)
+}

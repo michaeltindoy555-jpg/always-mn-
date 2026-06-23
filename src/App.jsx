@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { subscribeShared, subscribeJournal, subscribeLetters, subscribeBucket, subscribeMemories } from './firebase/firestore'
+import { registerFCMToken, onForegroundMessage } from './firebase/fcm'
 import HomeTab from './components/HomeTab'
+import ChatTab from './components/ChatTab'
 import JournalTab from './components/JournalTab'
 import MoodTab from './components/MoodTab'
 import LettersTab from './components/LettersTab'
@@ -13,6 +15,7 @@ import MemoryAlbumTab from './components/MemoryAlbumTab'
 
 const TABS = [
   { id: 'home',    icon: 'ti-home',            label: 'Home' },
+  { id: 'chat',    icon: 'ti-message',          label: 'Chat' },
   { id: 'journal', icon: 'ti-notebook',         label: 'Journal' },
   { id: 'mood',    icon: 'ti-mood-smile',       label: 'Mood' },
   { id: 'letters', icon: 'ti-mail',             label: 'Letters' },
@@ -32,6 +35,7 @@ export default function App() {
   const [letters, setLetters] = useState([])
   const [bucket, setBucket] = useState([])
   const [memories, setMemories] = useState([])
+  const [toast, setToast] = useState(null)  // foreground push toast
 
   useEffect(() => {
     const unsubs = [
@@ -44,13 +48,27 @@ export default function App() {
     return () => unsubs.forEach(u => u())
   }, [])
 
+  // Register FCM token whenever user switches (M or N)
+  useEffect(() => {
+    registerFCMToken(currentUser)
+  }, [currentUser])
+
+  // Show in-app toast for foreground push messages
+  useEffect(() => {
+    const unsub = onForegroundMessage((payload) => {
+      const msg = payload.notification?.body || payload.notification?.title || '💗 New notification'
+      setToast(msg)
+      setTimeout(() => setToast(null), 4000)
+    })
+    return () => unsub()
+  }, [])
+
   // Ping badge: show dot on Home tab if there's an unread ping for currentUser
   const hasPing = shared.ping?.to === currentUser && shared.ping?.unread === true
 
   const handleTabClick = (id) => setActiveTab(id)
   const switchUser = (u) => setCurrentUser(u)
 
-  // Background photo from shared Firestore doc
   const bgPhoto = shared.bgPhoto || null
 
   return (
@@ -83,6 +101,20 @@ export default function App() {
 
       {/* All content above overlay */}
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+
+        {/* Foreground push toast */}
+        {toast && (
+          <div style={{
+            position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+            background: 'var(--pink)', color: '#fff', borderRadius: 20,
+            padding: '10px 18px', fontSize: 13, fontWeight: 500,
+            zIndex: 999, boxShadow: '0 4px 16px rgba(0,0,0,.4)',
+            maxWidth: 340, textAlign: 'center',
+            animation: 'fadeIn .2s ease',
+          }}>
+            {toast}
+          </div>
+        )}
 
         {/* Header */}
         <div style={{
@@ -148,6 +180,7 @@ export default function App() {
               }}>
               <span style={{ position: 'relative', display: 'inline-flex' }}>
                 <i className={`ti ${t.icon}`} style={{ fontSize: 20 }} />
+                {/* Ping badge on Home */}
                 {t.id === 'home' && hasPing && (
                   <span style={{
                     position: 'absolute', top: -3, right: -5,
@@ -163,6 +196,7 @@ export default function App() {
 
         {/* Pages */}
         {activeTab === 'home'     && <HomeTab currentUser={currentUser} shared={shared} setShared={setShared} hasPing={hasPing} />}
+        {activeTab === 'chat'     && <ChatTab currentUser={currentUser} />}
         {activeTab === 'journal'  && <JournalTab currentUser={currentUser} journal={journal} />}
         {activeTab === 'mood'     && <MoodTab currentUser={currentUser} shared={shared} />}
         {activeTab === 'letters'  && <LettersTab currentUser={currentUser} letters={letters} />}
@@ -174,6 +208,7 @@ export default function App() {
         {activeTab === 'memories' && <MemoryAlbumTab currentUser={currentUser} memories={memories} />}
 
         <style>{`
+          @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(-8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
           .card {
             background: ${bgPhoto ? 'rgba(22, 12, 22, 0.82)' : 'var(--card)'};
             border: 0.5px solid var(--border);
