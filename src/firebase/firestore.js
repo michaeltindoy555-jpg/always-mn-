@@ -32,7 +32,6 @@ export async function addJournalEntry(entry) {
 export async function deleteJournalEntry(id) {
   await deleteDoc(doc(db, 'shared', DOC, 'journal', id))
 }
-// NEW: update journal entry (used for emoji reactions)
 export async function updateJournalEntry(id, data) {
   await updateDoc(doc(db, 'shared', DOC, 'journal', id), data)
 }
@@ -93,6 +92,9 @@ export async function addMemoryPhoto(data) {
 export async function deleteMemoryPhoto(id) {
   await deleteDoc(doc(db, 'shared', DOC, 'memories', id))
 }
+export async function updateMemoryPhoto(id, data) {
+  await updateDoc(doc(db, 'shared', DOC, 'memories', id), data)
+}
 
 // ── Voice Messages ────────────────────────────────────────────────────────────
 const voiceCol = () => collection(db, 'shared', DOC, 'voice')
@@ -107,19 +109,50 @@ export async function addVoiceMessage(data) {
 export async function markVoicePlayed(id) {
   await updateDoc(doc(db, 'shared', DOC, 'voice', id), { played: true })
 }
+
 // ── Chat ──────────────────────────────────────────────────────────────────────
+const CHAT_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+
 const chatCol = () => collection(db, 'shared', DOC, 'chat')
 export function subscribeChat(cb) {
-  return onSnapshot(query(chatCol(), orderBy('createdAt', 'asc')), snap =>
-    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  )
+  return onSnapshot(query(chatCol(), orderBy('createdAt', 'asc')), snap => {
+    const now = Date.now()
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    docs.forEach(msg => {
+      if (msg.expiresAt && msg.expiresAt < now) {
+        deleteDoc(doc(db, 'shared', DOC, 'chat', msg.id)).catch(() => {})
+      }
+    })
+    cb(docs.filter(msg => !msg.expiresAt || msg.expiresAt >= now))
+  })
 }
 export async function addChatMessage(msg) {
-  await addDoc(chatCol(), { ...msg, createdAt: serverTimestamp() })
+  await addDoc(chatCol(), {
+    ...msg,
+    createdAt: serverTimestamp(),
+    expiresAt: Date.now() + CHAT_TTL_MS,
+  })
 }
 export async function deleteChatMessage(id) {
   await deleteDoc(doc(db, 'shared', DOC, 'chat', id))
 }
 export async function updateChatMessage(id, data) {
   await updateDoc(doc(db, 'shared', DOC, 'chat', id), data)
+}
+
+// ── Playlist ──────────────────────────────────────────────────────────────────
+const playlistCol = () => collection(db, 'shared', DOC, 'playlist')
+export function subscribePlaylist(cb) {
+  return onSnapshot(query(playlistCol(), orderBy('createdAt', 'desc')), snap =>
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  )
+}
+export async function addPlaylistSong(data) {
+  await addDoc(playlistCol(), { ...data, createdAt: serverTimestamp() })
+}
+export async function deletePlaylistSong(id) {
+  await deleteDoc(doc(db, 'shared', DOC, 'playlist', id))
+}
+export async function updatePlaylistSong(id, data) {
+  await updateDoc(doc(db, 'shared', DOC, 'playlist', id), data)
 }
